@@ -1,6 +1,7 @@
 import os
 import random
 import asyncio
+import shutil
 import discord
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
@@ -25,8 +26,8 @@ async def play_sound(vc):
     if vc and vc.is_connected():
         sound_path = get_random_sound()
         if sound_path and not vc.is_playing():
-            # На Linux/Railway запускаем ffmpeg без .exe
-            vc.play(discord.FFmpegPCMAudio(sound_path))
+            ffmpeg_path = shutil.which("ffmpeg") or "/usr/bin/ffmpeg"
+            vc.play(discord.FFmpegPCMAudio(sound_path, executable=ffmpeg_path))
             print(f"🔊 Воспроизводится: {sound_path}")
             while vc.is_playing():
                 await asyncio.sleep(1)
@@ -36,7 +37,6 @@ async def sound_loop():
     for guild in bot.guilds:
         vc = guild.voice_client
         if vc and vc.is_connected() and not vc.is_playing():
-            # Задержка перед следующим случайным звуком (1-10 минут)
             wait_time = random.randint(60, 600)
             print(f"⏳ Следующий звук в {guild.name} через {wait_time // 60} мин.")
             await asyncio.sleep(wait_time)
@@ -66,10 +66,10 @@ async def join(interaction: discord.Interaction):
 
         await interaction.followup.send(f"Присоединился к {channel.name}!")
 
-        # 1. Запускаем первый звук фоном сразу при входе
+        # 1. Проигрываем звук сразу при входе
         asyncio.create_task(play_sound(vc))
 
-        # 2. Запускаем фоновый цикл для постоянных звуков
+        # 2. Запускаем фоновый цикл для случайных звуков
         if not sound_loop.is_running():
             sound_loop.start()
     else:
